@@ -1,0 +1,133 @@
+module chacha20block where
+import chacha_openhitls
+
+CHACHA20_Update : {n, t}(fin n, t == n / 64, n / 64 >= 1, n % 64 == 0) => CRYPT_CHACHA20_Ctx
+    -> [n][8] -> [32] -> (CRYPT_CHACHA20_Ctx, [n][8])
+CHACHA20_Update ctx inp len = (ctxs@`t, out)
+    where ctxs = [ctx] # [CHACHA20_Block ct | ct <- ctxs | i <- [1..t]]
+          ctxs2 = (drop`{1} ctxs)
+          us = [(ct.last.u) | ct <- ctxs2 ]
+          ccs = (groupBy`{32} (join (join us)))
+          ccss = [ (reverse (groupBy`{8} cc)) | cc <- ccs]
+          ccss2 = join ccss
+          out = [ in ^ u | in <- inp | u <- ccss2 ]
+
+
+
+// CRYPT_CHACHA20_Update - corresponds to the C function of the same name
+// This function handles partial blocks, complete blocks, and remaining data
+// k = lastLen (bytes remaining from previous operation)
+// full_blocks = number of complete 64-byte blocks to process
+// remaining = bytes left after processing complete blocks
+// Simplified version for cases where full_blocks > 0 and remaining == 0
+CRYPT_CHACHA20_Update : {total_len, k, full_blocks}
+    (fin total_len, fin k, fin full_blocks,
+     0 <= k, k < 64,
+     total_len >= k,
+     full_blocks == (total_len - k) / 64,
+     (total_len - k) % 64 == 0,
+     full_blocks * 64 + k == total_len,
+     full_blocks >= 1) =>
+    CRYPT_CHACHA20_Ctx -> [total_len][8] -> [32] -> (CRYPT_CHACHA20_Ctx, [total_len][8])
+CRYPT_CHACHA20_Update ctx inp len = (ctx_final, out_final)
+    where
+        // Step 1: Handle existing partial block (k bytes from last operation)
+        last_keystream = drop`{64 - k} ctx.last.u
+        out1 = [ inp_byte ^ key_byte | inp_byte <- take`{k} inp | key_byte <- take`{k} last_keystream ]
+
+        // Step 2: Process remaining input after k bytes
+        remaining_inp = drop`{k} inp
+
+        // Step 3: Process complete 64-byte blocks (guaranteed non-empty due to full_blocks >= 1)
+        (ctx_final, out2) = CHACHA20_Update ctx remaining_inp len
+
+        // Combine all outputs: k + full_blocks*64 = total_len
+        out_final = out1 # out2
+
+
+
+
+
+
+// Test cases for CRYPT_CHACHA20_Update with different lastLen values
+// Test case 1: 129 bytes input (lastLen=1, 2 blocks) - returns actual output
+test_CRYPT_CHACHA20_Update_129 : [129][8]
+test_CRYPT_CHACHA20_Update_129 = result
+    where
+        // Test context with known key and nonce (matches C test parameters)
+        test_ctx = {
+            state = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574,  // Constants
+                     0x03020100, 0x07060504, 0x0b0a0908, 0x0f0e0d0c,  // Key part 1
+                     0x13121110, 0x17161514, 0x1b1a1918, 0x1f1e1d1c,  // Key part 2
+                     0x00000001,                                        // Counter
+                     0x09000000, 0x4a000000, 0x00000000],              // Nonce
+            last = {
+                c = [0 | _ <- [0..15]],
+                u = [0 | _ <- [0..63]]
+            },
+            lastLen = 1,
+            set = 0x03
+        }
+        // Test input: 129 bytes of sequential data (matches C test)
+        test_input = [i | i <- [0..128]]
+
+        // Call function with type parameters: total_len=129, k=1, full_blocks=2
+        // 129 - 1 = 128; 128/64 = 2 blocks; 128%64 = 0 remaining
+        (final_ctx, result) = CRYPT_CHACHA20_Update`{129, 1, 2} test_ctx test_input 129
+
+// Test case 2: 192 bytes input (lastLen=0, 3 blocks) - returns actual output  
+test_CRYPT_CHACHA20_Update_192 : [192][8]
+test_CRYPT_CHACHA20_Update_192 = result
+    where
+        test_ctx = {
+            state = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574,
+                     0x03020100, 0x07060504, 0x0b0a0908, 0x0f0e0d0c,
+                     0x13121110, 0x17161514, 0x1b1a1918, 0x1f1e1d1c,
+                     0x00000001,
+                     0x09000000, 0x4a000000, 0x00000000],
+            last = {
+                c = [0 | _ <- [0..15]],
+                u = [0 | _ <- [0..63]]
+            },
+            lastLen = 0,
+            set = 0x03
+        }
+
+        test_input = [i | i <- [0..191]]
+        // Call function with type parameters: total_len=192, k=0, full_blocks=3
+        // 192 - 0 = 192; 192/64 = 3 blocks; 192%64 = 0 remaining
+        (final_ctx, result) = CRYPT_CHACHA20_Update`{192, 0, 3} test_ctx test_input 192
+
+// Test case 3: 64 bytes input (lastLen=0, 1 block) - returns actual output
+test_CRYPT_CHACHA20_Update_64 : [64][8]
+test_CRYPT_CHACHA20_Update_64 = result
+    where
+        // RFC 7539 test vector setup (matches C test parameters)
+        test_ctx = {
+            state = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574,  // "expand 32-byte k"
+                     0x03020100, 0x07060504, 0x0b0a0908, 0x0f0e0d0c,  // Key: 00010203...
+                     0x13121110, 0x17161514, 0x1b1a1918, 0x1f1e1d1c,
+                     0x00000001,                                        // Counter = 1
+                     0x09000000, 0x4a000000, 0x00000000],              // Nonce
+            last = {
+                c = [0 | _ <- [0..15]],
+                u = [0 | _ <- [0..63]]
+            },
+            lastLen = 0,
+            set = 0x03
+        }
+
+        // Test with 64 bytes of zeros (matches C test)
+        test_input = [0 | _ <- [0..63]]
+        // Call function with type parameters: total_len=64, k=0, full_blocks=1
+        // 64 - 0 = 64; 64/64 = 1 block; 64%64 = 0 remaining
+        (final_ctx, result) = CRYPT_CHACHA20_Update`{64, 0, 1} test_ctx test_input 64
+
+// Verification helper: check if first 16 bytes match RFC 7539 expected keystream
+verify_rfc7539_keystream : Bit
+verify_rfc7539_keystream = take`{16} test_CRYPT_CHACHA20_Update_64 == expected_start
+    where expected_start = [0x10, 0xf1, 0xe7, 0xe4, 0xd1, 0x3b, 0x59, 0x15,
+                           0x50, 0x0f, 0xdd, 0x1f, 0xa3, 0x20, 0x71, 0xc4]
+
+
+
