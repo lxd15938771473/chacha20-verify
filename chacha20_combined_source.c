@@ -14,7 +14,6 @@
  */
 
 #include "hitls_build.h"
-#ifdef HITLS_CRYPTO_CHACHA20
 
 #include "securec.h"
 #include "bsl_err_internal.h"

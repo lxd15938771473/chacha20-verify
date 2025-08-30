@@ -125,7 +125,8 @@ CHACHA20_Block ctx = ctx'
         state = ctx.state
         cround = (iterate ROUND state) @ 10
         cs = [ (cround @ i) + (state @ i) | i <- [0 .. 15] ]
-        ce = [ join ((split`{4} ci)) | ci <- cs ]
+        //ce = [ join (split`{4} ci) | ci <- cs ]
+        ce = [ join (reverse (split`{4} ci)) | ci <- cs ]
         ue = (groupBy`{8} (join ce))
         state' = [ if i == 12 then (state @ 12 + 1) else state @ i | i <- [0 .. 15]]
 
