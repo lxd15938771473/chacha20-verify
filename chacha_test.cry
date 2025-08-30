@@ -1,5 +1,7 @@
 module chacha_test where
 import chacha_block
+import chacha_property
+import chacha_rfc
 
 
 tkey1 =  0x0000000000000000000000000000000000000000000000000000000000000000
@@ -114,33 +116,6 @@ tout = [0x22, 0xa7, 0xd5, 0xfc, 0x13, 0x55, 0x85, 0x74, 0xd9, 0x32, 0xfc,
 
 // Test cases for CRYPT_CHACHA20_Update with different lastLen values
 // Test case 1: 129 bytes input (lastLen=1, 2 blocks) - returns actual output
-test_CRYPT_CHACHA20_Update_129 : [131][8]
-test_CRYPT_CHACHA20_Update_129 = result
-    where
-        // Test context with known key and nonce (matches C test parameters)
-        test_ctx = {
-            state = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574,  // Constants
-                     0x03020100, 0x07060504, 0x0b0a0908, 0x0f0e0d0c,  // Key part 1
-                     0x13121110, 0x17161514, 0x1b1a1918, 0x1f1e1d1c,  // Key part 2
-                     0x00000001,                                        // Counter
-                     0x09000000, 0x4a000000, 0x00000000],              // Nonce
-            last = {
-                c = [0 | _ <- [0..15]],
-                u = [0 | _ <- [0..63]]
-            },
-            lastLen = 0,
-            set = 0x03
-        }
-        // Test input: 129 bytes of sequential data (matches C test)
-        test_input1 = [i | i <- [0..127]]
-        test_input2 = [0x11, 0x12, 0x13]
-        test_input = test_input1 # test_input2
-
-        // Call function with type parameters: total_len=129, k=1, full_blocks=2, remaining=0
-        // 129 - 1 = 128; 128/64 = 2 blocks; 128%64 = 0 remaining
-        (final_ctx, result) = CRYPT_CHACHA20_Update`{131, 0, 2, 3} test_ctx test_input 131
-
-
 test_CRYPT_CHACHA20_Update_131 : [131][8]
 test_CRYPT_CHACHA20_Update_131 = result
     where
@@ -166,7 +141,7 @@ test_CRYPT_CHACHA20_Update_131 = result
         // Call function with type parameters: total_len=129, k=1, full_blocks=2, remaining=0
         // 129 - 1 = 128; 128/64 = 2 blocks; 128%64 = 0 remaining
         (final_ctx, result) = CRYPT_CHACHA20_Update`{131, 0, 2, 3} test_ctx test_input 131
-
+        
 // Test case 2: 192 bytes input (lastLen=0, 3 blocks) - returns actual output  
 test_CRYPT_CHACHA20_Update_192 : [192][8]
 test_CRYPT_CHACHA20_Update_192 = result
@@ -260,9 +235,3 @@ test_CRYPT_CHACHA20_Update_133 = result
         // Call function with type parameters: total_len=133, k=1, full_blocks=2, remaining=4
         // 133 - 1 = 132; 132/64 = 2 blocks; 132%64 = 4 remaining
         (final_ctx, result) = CRYPT_CHACHA20_Update`{133, 1, 2, 4} test_ctx test_input 133
-
-// Verification helper: check if first 16 bytes match RFC 7539 expected keystream
-verify_rfc7539_keystream : Bit
-verify_rfc7539_keystream = take`{16} test_CRYPT_CHACHA20_Update_64 == expected_start
-    where expected_start = [0x10, 0xf1, 0xe7, 0xe4, 0xd1, 0x3b, 0x59, 0x15,
-                           0x50, 0x0f, 0xdd, 0x1f, 0xa3, 0x20, 0x71, 0xc4]

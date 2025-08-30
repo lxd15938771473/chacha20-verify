@@ -3,15 +3,17 @@ import chacha_block
 import chacha_openhitls
 import chacha_rfc
 
-CHACHA20_ENC : {a, k} (fin a, fin k, 32 >= width a, k == a / 4) => [256] -> [32] -> [96] -> [a][8] -> [a][8]
+
+//ENCRYPTION
+CHACHA20_ENC : {a, k, z} (fin a, fin k, fin z, 32 >= width a, k == a / 4, z == 4 - a % 4) => [256] -> [32] -> [96] -> [a][8] -> [a][8]
 CHACHA20_ENC key count nonce msg = out3
     where ctx = CRYPT_CHACHA20_SetKey Ctx (groupBy`{8} (key))
           ctx' = CRYPT_CHACHA20_SetNonce (CRYPT_CHACHA20_SetCount ctx (reverse (groupBy`{8} count))) (groupBy`{8} (nonce))
           msg1 = take`{k*4} msg
           msg2 = drop`{k*4} msg
-          (final_ctx, out) = CRYPT_CHACHA20_Update`{a, 0, a/64, (a-(a/64)*64)} ctx' ((join ([reverse o | o <- (groupBy`{4} msg1)])) # (reverse msg2)) (length msg)
+          (final_ctx, out) = CRYPT_CHACHA20_Update`{a+z, 0, (a+z)/64, (a+z-((a+z)/64)*64)} ctx' ((join ([reverse o | o <- (groupBy`{4} msg1)])) # (reverse ((msg2 # zero):[4][8]))) (length msg)
           out1 = take`{k*4} out
-          out2 = drop`{k*4} out
+          out2 = drop`{k*4} (drop`{z} out)
           out3 = ((join ([reverse o | o <- (groupBy`{4} out1)])) # (reverse out2))
 
 CHACHA20_ENC2 : {a} (fin a, 32 >= width a, a % 64 == 0) => [256] -> [32] -> [96] -> [a][8] -> [a][8]
@@ -47,14 +49,24 @@ property ChaChaDiffCounter k i n1 n2 msg = if (CHACHA20_ENC k i n1 msg) !=  (CHA
 //:prove ChaChaDiffCounter : [256] -> [32] -> [96] -> [96] -> [128][8] -> Bit
 
 //:prove ChaCha20Equal : [256] -> [32] -> [96] -> [128][8] -> Bit
-ChaCha20Equal : {a, k} (fin a, fin k, 32 >= width a, k == a / 4) => 
+// ChaCha20Equal : {a, k, z} (fin a, fin k, fin z, 32 >= width a, k == a / 4, z == 4 - a % 4) => 
+//     [256] -> [32] -> [96] -> [a][8] -> Bit
+// property ChaCha20Equal key count nonce msg = b
+//     where ctx = CRYPT_CHACHA20_SetKey Ctx (groupBy`{8} key)
+//           ctx' = CRYPT_CHACHA20_SetNonce (CRYPT_CHACHA20_SetCount ctx (reverse (groupBy`{8} count))) (groupBy`{8} nonce)
+//           msg1 = take`{k*4} msg
+//           msg2 = drop`{k*4} msg
+//           (final_ctx, out) = CRYPT_CHACHA20_Update`{a+z, 0, (a+z)/64, (a+z-((a+z)/64)*64)} ctx' ((join ([reverse o | o <- (groupBy`{4} msg1)])) # (reverse ((msg2 # zero):[4][8]))) (length msg)
+//           out1 = take`{k*4} out
+//           out2 = drop`{k*4} (drop`{z} out)
+//           b = ((join ([reverse o | o <- (groupBy`{4} out1)])) # (reverse out2)) == (ChaCha20Encrypt key count nonce msg)
+
+
+//yices
+ChaCha20Equal : {a, k, z} (fin a, fin k, fin z, 32 >= width a, k == a / 4, z == 4 - a % 4) => 
     [256] -> [32] -> [96] -> [a][8] -> Bit
 property ChaCha20Equal key count nonce msg = b
-    where ctx = CRYPT_CHACHA20_SetKey Ctx (groupBy`{8} key)
-          ctx' = CRYPT_CHACHA20_SetNonce (CRYPT_CHACHA20_SetCount ctx (reverse (groupBy`{8} count))) (groupBy`{8} nonce)
-          msg1 = take`{k*4} msg
-          msg2 = drop`{k*4} msg
-          (final_ctx, out) = CRYPT_CHACHA20_Update`{a, 0, a/64, (a-(a/64)*64)} ctx' ((join ([reverse o | o <- (groupBy`{4} msg1)])) # (reverse msg2)) (length msg)
-          out1 = take`{k*4} out
-          out2 = drop`{k*4} out
-          b = ((join ([reverse o | o <- (groupBy`{4} out1)])) # (reverse out2)) == (ChaCha20Encrypt key count nonce msg)
+    where out1 = CHACHA20_ENC key count nonce msg
+          out2 = ChaCha20Encrypt key count nonce msg
+          b = (out1 == out2)
+//:prove ChaChaDiffCounter : [256] -> [32] -> [96] -> [96] -> [128][8] -> Bit  

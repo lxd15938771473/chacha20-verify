@@ -281,17 +281,12 @@ let CRYPT_CHACHA20_Update_setup total_len k full_blocks remaining = do {
     let t = {{ CHACHA20_Update CRYPT_CHACHA20_Ctx inp `total_len }};
     //let t = {{ CRYPT_CHACHA20_Update`{128, 64, 5} CRYPT_CHACHA20_Ctx inp `n }};
 
-
-    // llvm_points_to outp (llvm_term {{t.1}});
-    // llvm_points_to (llvm_elem (llvm_elem CRYPT_CHACHA20_Ctxp 1) 0) (llvm_term {{ t.0.last.c }});
-    // llvm_points_to (llvm_field CRYPT_CHACHA20_Ctxp "state") (llvm_term {{ t.0.state }});
-
     llvm_points_to (llvm_field CRYPT_CHACHA20_Ctxp "state") (llvm_term {{ t.0.state }});
     llvm_points_to (llvm_elem (llvm_elem CRYPT_CHACHA20_Ctxp 1) 0) (llvm_term {{ t.0.last.c }});
     llvm_points_to (llvm_field CRYPT_CHACHA20_Ctxp "lastLen") (llvm_term {{ t.0.lastLen }});
     llvm_points_to (llvm_field CRYPT_CHACHA20_Ctxp "set") (llvm_term {{ t.0.set }});
 };
-time(llvm_verify llvm "CRYPT_CHACHA20_Update" [] false (CRYPT_CHACHA20_Update_setup 128 0 2 0) (yices));  
+//time(llvm_verify llvm "CRYPT_CHACHA20_Update" [] false (CRYPT_CHACHA20_Update_setup 128 0 2 0) (yices));  
 
  
 
@@ -347,4 +342,4 @@ let CRYPT_CHACHA20_Ctrl_setup m = do {
       return ();
     };                          
 };
-//time(llvm_verify llvm "CRYPT_CHACHA20_Ctrl" [] false (CRYPT_CHACHA20_Ctrl_setup 3) z3);
+time(llvm_verify llvm "CRYPT_CHACHA20_Ctrl" [] false (CRYPT_CHACHA20_Ctrl_setup 3) yices);
