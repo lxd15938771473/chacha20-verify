@@ -237,11 +237,11 @@ let CHACHA20_Update_setup n = do {
                                     lastLen = CRYPT_CHACHA20_Ctxp_lastLen,
                                     set = CRYPT_CHACHA20_Ctxp_set } }};
     let t = {{ CHACHA20_Update CRYPT_CHACHA20_Ctx inp `n }};
+    llvm_points_to outp (llvm_term {{t.1}});
     llvm_points_to (llvm_field CRYPT_CHACHA20_Ctxp "state") (llvm_term {{ t.0.state }});
     llvm_points_to (llvm_elem (llvm_elem CRYPT_CHACHA20_Ctxp 1) 0) (llvm_term {{ t.0.last.c }});
     llvm_points_to (llvm_field CRYPT_CHACHA20_Ctxp "lastLen") (llvm_term {{ t.0.lastLen }});
     llvm_points_to (llvm_field CRYPT_CHACHA20_Ctxp "set") (llvm_term {{ t.0.set }});
-    llvm_points_to outp (llvm_term {{t.1}});
 };
 update <- time(llvm_verify llvm "CHACHA20_Update" [] false (CHACHA20_Update_setup 128) yices);
 

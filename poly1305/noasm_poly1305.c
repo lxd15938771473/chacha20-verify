@@ -131,6 +131,15 @@ uint32_t Poly1305Block(Poly1305Ctx *ctx, const uint8_t *data, uint32_t dataLen, 
     return len;
 }
 
+
+#define PUT_UINT32_LE(v, p, i)               \
+do {                                         \
+    (p)[(i) + 3] = (uint8_t)((v) >> 24);     \
+    (p)[(i) + 2] = (uint8_t)((v) >> 16);     \
+    (p)[(i) + 1] = (uint8_t)((v) >>  8);     \
+    (p)[(i) + 0] = (uint8_t)((v) >>  0);     \
+} while (0)
+
 void Poly1305Last(Poly1305Ctx *ctx, uint8_t mac[POLY1305_TAGSIZE])
 {
     uint32_t a[5];
